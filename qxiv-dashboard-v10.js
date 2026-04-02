@@ -227,7 +227,7 @@
 
   function renderAdminStats(){
     var tot=allMembers.filter(function(m){return m.role!=='admin';}).length;
-    var pen=allMembers.filter(function(m){return m.status==='pending';}).length;
+    var pen=allMembers.filter(function(m){return m.status==='pending'||m.status==='approved'||m.status==='contract_signed';}).length;
     var act=allMembers.filter(function(m){return m.status==='active'&&m.role!=='admin';}).length;
     var rej=allMembers.filter(function(m){return m.status==='rejected';}).length;
     set('adm-stat-total',tot);set('adm-stat-pending',pen);set('adm-stat-active',act);
@@ -279,8 +279,8 @@
     var rm={bronze:'ブロンズ',silver:'シルバー',gold:'ゴールド',platinum:'プラチナ'};
     el.innerHTML=f.map(function(m){
       var rl=m.role==='signer'?'サイナー':'バンカー';
-      var sl=m.status==='active'?'有効':m.status==='pending'?'審査待ち':'否認済み';
-      var sc=m.status==='active'?'badge-green':m.status==='pending'?'badge-orange':'badge-gray';
+      var sl=m.status==='active'?'有効':m.status==='pending'?'審査待ち':m.status==='approved'?'契約書未同意':m.status==='contract_signed'?'同意済み':'否認済み';
+      var sc=m.status==='active'?'badge-green':m.status==='pending'?'badge-orange':m.status==='approved'?'badge-gray':m.status==='contract_signed'?'badge-blue':'badge-gray';
       var exp=m.expiry_date?new Date(m.expiry_date).toLocaleDateString('ja-JP'):'—';
       return '<tr><td><span class="mem-no">'+(m.member_no||'未発番')+'</span></td>'
         +'<td style="font-weight:600;">'+esc(m.full_name||'—')+'</td>'
@@ -289,7 +289,10 @@
         +'<td><span class="badge '+sc+'">'+sl+'</span></td>'
         +'<td style="font-size:11px;color:var(--ink-muted);">'+exp+'</td>'
         +'<td style="font-size:10px;color:var(--red);">'+(m.referral_code||'—')+'</td>'
-        +'<td><button class="btn-sm btn-sm-blue" onclick="openEdit(\''+m.id+'\')">編集</button></td></tr>';
+        +'<td><div style="display:flex;gap:5px;">'
+        +(m.status==='contract_signed'?'<button class="btn-sm btn-sm-red" onclick="openIssueLogin(\''+m.id+'\',\''+esc(m.full_name||'')+'\')">ログイン発行</button>':'')
+        +'<button class="btn-sm btn-sm-blue" onclick="openEdit(\''+m.id+'\')">編集</button>'
+        +'</div></td></tr>';
     }).join('');
   }
 
@@ -412,6 +415,17 @@
         fetch(API+'/api/admin/members/reject',{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({user_id:id})})
           .then(function(r){return r.json();})
           .then(function(d){closeModal();if(d.message){alert('否認しました。');loadAdminData();}else alert('エラー：'+(d.error||'不明'));});
+      });
+  };
+
+  window.openIssueLogin=function(id,name){
+    showModal('ログイン情報を発行する',
+      '<div style="padding:12px;background:var(--red-light);border:1px solid rgba(169,27,13,.2);border-radius:3px;margin-bottom:14px;font-size:12px;color:var(--red);">'+name+' 様にログイン情報を発行します</div>'
+      +'<p style="font-size:12px;color:var(--ink-muted);">ログインIDとパスワードをメールで送信します。ステータスが「有効」に変更されます。</p>',
+      function(){
+        fetch(API+'/api/admin/members/issue',{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({user_id:id})})
+          .then(function(r){return r.json();})
+          .then(function(d){closeModal();if(d.message){alert('ログイン情報を発行しました。');loadAdminData();}else alert('エラー：'+(d.error||'不明'));});
       });
   };
 
