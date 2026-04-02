@@ -491,6 +491,35 @@
     window.scrollTo(0,0);
   };
 
+  window.changePassword=function(){
+    var current=document.getElementById('cp-current').value;
+    var newpw=document.getElementById('cp-new').value;
+    var confirm=document.getElementById('cp-confirm').value;
+    var msgEl=document.getElementById('cp-msg');
+    if(!current||!newpw||!confirm){showCpMsg('すべての項目を入力してください。','error');return;}
+    if(newpw.length<8){showCpMsg('新しいパスワードは8文字以上で入力してください。','error');return;}
+    if(newpw!==confirm){showCpMsg('新しいパスワードが一致しません。','error');return;}
+    fetch(API+'/api/auth/change-password',{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body:JSON.stringify({current_password:current,new_password:newpw})})
+      .then(function(r){return r.json();})
+      .then(function(d){
+        if(d.message){
+          showCpMsg('パスワードを変更しました。','success');
+          document.getElementById('cp-current').value='';
+          document.getElementById('cp-new').value='';
+          document.getElementById('cp-confirm').value='';
+        } else {
+          showCpMsg('エラー：'+(d.error||'不明なエラー'),'error');
+        }
+      }).catch(function(){showCpMsg('通信エラーが発生しました。','error');});
+  };
+  function showCpMsg(text,type){
+    var el=document.getElementById('cp-msg');if(!el)return;
+    el.className='msg-'+(type==='error'?'error':'success');
+    el.style.cssText='padding:10px 14px;border-radius:3px;font-size:12px;margin-top:10px;display:block;'+(type==='error'?'background:#FDF2F1;color:#A91B0D;border:1px solid rgba(169,27,13,.2);':'background:#EAF7F0;color:#166834;border:1px solid #BBF7D0;');
+    el.textContent=text;
+  }
+
   window.doLogout=function(){
     localStorage.removeItem('qxiv_token');localStorage.removeItem('qxiv_refresh');localStorage.removeItem('qxiv_user');
     window.location.href='/login';
