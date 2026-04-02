@@ -221,7 +221,7 @@
       .then(function(r){return r.json();})
       .then(function(data){
         allMembers=data.members||[];
-        renderAdminStats();renderPendingPreview();renderPendingFull();renderMembersTable(allMembers);
+        renderAdminStats();renderPendingPreview();renderContractSignedPreview();renderPendingFull();renderMembersTable(allMembers);
       }).catch(function(){});
   }
 
