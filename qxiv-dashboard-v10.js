@@ -235,6 +235,21 @@
     var b=document.getElementById('pending-badge');if(b){b.textContent=pen;b.style.display=pen>0?'inline':'none';}
   }
 
+  function renderContractSignedPreview(){
+    var p=allMembers.filter(function(m){return m.status==='contract_signed';});
+    var el=document.getElementById('contract-signed-preview');if(!el)return;
+    if(!p.length){el.innerHTML='<div style="padding:10px;text-align:center;font-size:12px;color:var(--ink-faint);">発行待ちはありません</div>';return;}
+    el.innerHTML=p.map(function(m){
+      var ch=(m.full_name||'会').charAt(0);
+      return '<div class="pending-row"><div class="avatar new" style="background:var(--gold);">'+ch+'</div>'
+        +'<div class="pending-info"><div class="pending-name">'+esc(m.full_name||'—')+'</div>'
+        +'<div class="pending-time">契約書同意済み・ログイン未発行</div></div>'
+        +'<div class="pending-actions">'
+        +'<button class="btn-approve" onclick="openIssueLogin(\''+m.id+'\',\''+esc(m.full_name||'')+'\')">発行</button>'
+        +'</div></div>';
+    }).join('');
+  }
+
   function renderPendingPreview(){
     var p=allMembers.filter(function(m){return m.status==='pending';}).slice(0,3);
     var el=document.getElementById('pending-preview');if(!el)return;
