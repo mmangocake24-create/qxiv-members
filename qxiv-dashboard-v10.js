@@ -161,7 +161,7 @@
         if(!isAdmin){
           var readIds=JSON.parse(localStorage.getItem('qxiv_read')||'[]');
           set('dash-unread',arts.filter(function(a){return readIds.indexOf(a.id)===-1;}).length);
-          renderPersonalArticles(arts.filter(function(a){return a.category==='personal';}));
+          renderPersonalArticles(arts.filter(function(a){return a.category==='personal'||a.target_role==='personal';}));
           renderCatArticles('cat-rules',  arts.filter(function(a){return a.category==='rules';}));
           renderCatArticles('cat-cases',  arts.filter(function(a){return a.category==='cases';}));
           renderCatArticles('cat-general',arts.filter(function(a){return a.category==='general';}));
