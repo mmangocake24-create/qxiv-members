@@ -348,7 +348,7 @@
       var cat=CAT_MAP[a.category]||a.category;
       return '<tr><td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(a.title)+'</td>'
         +'<td style="font-size:11px;"><span class="badge badge-gray">'+cat+'</span></td>'
-        +'<td style="font-size:11px;color:var(--ink-muted);">'+(roleMap[a.target_role]||a.target_role)+'</td>'
+        +'<td style="font-size:11px;color:var(--ink-muted);">'+(a.target_role==='personal'?renderTargetMembers(a.target_members):(roleMap[a.target_role]||a.target_role))+'</td>'
         +'<td><span class="badge '+(a.status==='published'?'badge-pub':'badge-draft')+'">'+(a.status==='published'?'公開中':'下書き')+'</span></td>'
         +'<td style="font-size:11px;color:var(--ink-muted);">'+d+'</td>'
         +'<td><div style="display:flex;gap:5px;">'
