@@ -192,7 +192,7 @@
       var cat=CAT_MAP[a.category]||a.category;
       var icon=THUMB_ICONS[a.category]||'📄';
       var isGold=a.category==='personal'||a.target_role==='signer';
-      return '<div class="article-row" style="padding:10px 14px;">'
+      return '<div class="article-row" style="padding:10px 14px;cursor:pointer;" onclick="window.location.href=\'/article?id='+a.id+'\'">'
         +'<div class="article-thumb'+(isGold?' gold':'')+'">'+icon+'</div>'
         +'<div class="article-info"><div class="article-title">'+esc(a.title)+'</div>'
         +'<div class="article-meta"><span class="badge badge-gray">'+cat+'</span><span>'+d+'</span></div></div></div>';
