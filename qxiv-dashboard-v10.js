@@ -351,6 +351,7 @@
   function renderAdminArticles(){
     var el=document.getElementById('articles-admin-tbody');if(!el)return;
     var roleMap={all:'全会員',banker:'バンカー',signer:'サイナー'};
+    if(!allMembers.length){setTimeout(renderAdminArticles,500);return;}
     if(!allAdminArticles.length){el.innerHTML='<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--ink-faint);">記事がありません</td></tr>';return;}
     el.innerHTML=allAdminArticles.map(function(a){
       var d=a.published_at?new Date(a.published_at).toLocaleDateString('ja-JP'):'—';
