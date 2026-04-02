@@ -339,6 +339,15 @@
     }).join('');
   }
 
+  function renderTargetMembers(ids){
+    if(!ids||!ids.length) return '個別指定（0名）';
+    var names=ids.map(function(id){
+      var m=allMembers.find(function(x){return x.id===id;});
+      return m?esc(m.full_name||'—'):'不明';
+    });
+    return '<span title="'+names.join('、')+'">個別指定（'+ids.length+'名）<br><small style="color:var(--ink-faint);">'+names.slice(0,2).join('、')+(names.length>2?'他':'')+'</small></span>';
+  }
+
   function renderAdminArticles(){
     var el=document.getElementById('articles-admin-tbody');if(!el)return;
     var roleMap={all:'全会員',banker:'バンカー',signer:'サイナー'};
