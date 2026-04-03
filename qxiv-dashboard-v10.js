@@ -1,4 +1,3 @@
-
 (function(){
   if(window.location.pathname.indexOf('dashboard')===-1)return;
 
@@ -18,9 +17,10 @@
   var RANK_MAP={bronze:'ブロンズ',silver:'シルバー',gold:'ゴールド',platinum:'プラチナ'};
   var CAT_MAP={rules:'規約・重要情報',cases:'案件情報',general:'お知らせ',content:'コンテンツ',personal:'専用記事'};
   var THUMB_ICONS={rules:'📋',cases:'💼',general:'📢',content:'📖',personal:'⭐'};
-  var isAdmin=false,allMembers=[],allAdminArticles=[],currentPanel='overview';
+  // ★ v11: サイナー用グローバル変数
+  var isAdmin=false,isSigner=false,allMembers=[],allAdminArticles=[],currentPanel='overview';
+  var signerBankers=[],signerContracts=[],signerRewards=[];
 
-  // ★ 通知用: localStorageキー
   var NOTIF_READ_KEY='qxiv_notif_read';
 
   var now=new Date(),wd=['日','月','火','水','木','金','土'];
@@ -49,11 +49,15 @@
       var p=data.profile;
       if(!p){showAuthError('プロフィール情報の取得に失敗しました。');return;}
       isAdmin=p.role==='admin';
+      // ★ v11: サイナー判定
+      isSigner=p.role==='signer';
       renderUser(p);
       loadArticles();
       loadReferral();
       if(isAdmin){loadAdminData();loadAdminArticles();loadAdminRanking();}
       if(!isAdmin&&p.role==='banker'){loadDashRanking();loadBankerContent();}
+      // ★ v11: サイナー初期ロード
+      if(isSigner){loadDashRanking();loadBankerContent();loadSignerBankers();loadSignerContracts();loadSignerRewards();}
       setStyle('qxiv-app','display','block');
     })
     .catch(function(e){
@@ -70,6 +74,11 @@
     } else {
       setStyle('member-dash-banker','display','block');
       set('stat-member-no',p.member_no||'—');set('stat-rank',rank);
+      // ★ v11: サイナー専用ナビ表示
+      if(isSigner){
+        setStyle('signer-nav','display','block');
+        set('sb-badge','SIGNER');
+      }
     }
     var av=document.getElementById('pf-avatar');if(av)av.textContent=(p.full_name||'会').charAt(0);
     set('pf-name',p.full_name||'—');
@@ -85,7 +94,216 @@
     }).join('');
   }
 
-  // ★ 通知バッジ更新
+  // ============================================================
+  // ★ v11: サイナー機能 ── 傘下バンカー
+  // ============================================================
+  function loadSignerBankers(){
+    fetch(API+'/api/signer/bankers',{headers:{'Authorization':'Bearer '+token}})
+      .then(function(r){return r.json();})
+      .then(function(data){
+        signerBankers=data.bankers||[];
+        renderSignerBankers();
+        renderSignerBankersPreview();
+        set('signer-stat-bankers',signerBankers.length);
+        var act=signerBankers.filter(function(b){return b.status==='active';}).length;
+        set('signer-stat-active-bankers',act);
+      }).catch(function(){});
+  }
+
+  function renderSignerBankersPreview(){
+    var el=document.getElementById('signer-bankers-preview');if(!el)return;
+    var list=signerBankers.slice(0,3);
+    if(!list.length){el.innerHTML='<div style="padding:16px;text-align:center;font-size:12px;color:var(--ink-faint);">傘下バンカーはいません</div>';return;}
+    el.innerHTML=list.map(function(b){
+      var sl=b.status==='active'?'有効':b.status==='pending'?'審査待ち':'その他';
+      var sc=b.status==='active'?'badge-green':'badge-orange';
+      return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">'
+        +'<div class="avatar" style="width:32px;height:32px;font-size:13px;background:var(--red-light);color:var(--red);">'+(b.full_name||'会').charAt(0)+'</div>'
+        +'<div style="flex:1;min-width:0;">'
+        +'<div style="font-size:13px;font-weight:600;color:var(--ink);">'+esc(b.full_name||'—')+'</div>'
+        +'<div style="font-size:11px;color:var(--ink-faint);">'+(b.member_no||'未発番')+'</div>'
+        +'</div>'
+        +'<span class="badge '+sc+'">'+sl+'</span>'
+        +'</div>';
+    }).join('')+'<div style="padding:8px 0;text-align:center;"><a href="#" onclick="switchPanel(\'signer-bankers\');return false;" style="font-size:11px;color:var(--red);font-weight:600;text-decoration:none;">すべて見る →</a></div>';
+  }
+
+  function renderSignerBankers(){
+    var el=document.getElementById('signer-bankers-tbody');if(!el)return;
+    var rm={bronze:'ブロンズ',silver:'シルバー',gold:'ゴールド',platinum:'プラチナ'};
+    if(!signerBankers.length){
+      el.innerHTML='<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--ink-faint);">傘下バンカーはいません</td></tr>';return;
+    }
+    el.innerHTML=signerBankers.map(function(b){
+      var sl=b.status==='active'?'有効':b.status==='pending'?'審査待ち':b.status==='approved'?'契約書未同意':b.status==='contract_signed'?'同意済み':'否認済み';
+      var sc=b.status==='active'?'badge-green':b.status==='pending'?'badge-orange':'badge-gray';
+      var exp=b.expiry_date?new Date(b.expiry_date).toLocaleDateString('ja-JP'):'—';
+      var reg=b.reg_date?new Date(b.reg_date).toLocaleDateString('ja-JP'):'—';
+      return '<tr>'
+        +'<td><span class="mem-no">'+(b.member_no||'未発番')+'</span></td>'
+        +'<td style="font-weight:600;">'+esc(b.full_name||'—')+'</td>'
+        +'<td style="font-size:11px;color:var(--ink-muted);">'+(b.kana_name||'—')+'</td>'
+        +'<td style="font-size:11px;color:var(--ink-muted);">'+(rm[b.rank]||b.rank||'—')+'</td>'
+        +'<td><span class="badge '+sc+'">'+sl+'</span></td>'
+        +'<td style="font-size:11px;color:var(--ink-faint);">'+reg+'</td>'
+        +'</tr>';
+    }).join('');
+  }
+
+  window.searchSignerBankers=function(q){
+    var el=document.getElementById('signer-bankers-tbody');if(!el)return;
+    var filtered=q?signerBankers.filter(function(b){
+      return (b.full_name||'').toLowerCase().includes(q.toLowerCase())||(b.member_no||'').toLowerCase().includes(q.toLowerCase());
+    }):signerBankers;
+    // 一時的に上書きして再描画
+    var backup=signerBankers;
+    signerBankers=filtered;
+    renderSignerBankers();
+    signerBankers=backup;
+  };
+
+  // ============================================================
+  // ★ v11: サイナー機能 ── 契約承認
+  // ============================================================
+  function loadSignerContracts(){
+    fetch(API+'/api/signer/contracts',{headers:{'Authorization':'Bearer '+token}})
+      .then(function(r){return r.json();})
+      .then(function(data){
+        signerContracts=data.contracts||[];
+        renderSignerContracts();
+        var pending=signerContracts.filter(function(c){return c.status==='pending';}).length;
+        set('signer-stat-pending-contracts',pending);
+        // 承認待ちバッジ
+        var badge=document.getElementById('signer-contracts-badge');
+        if(badge){badge.textContent=pending;badge.style.display=pending>0?'inline':'none';}
+      }).catch(function(){});
+  }
+
+  function renderSignerContracts(){
+    var el=document.getElementById('signer-contracts-list');if(!el)return;
+    if(!signerContracts.length){
+      el.innerHTML='<div style="padding:32px;text-align:center;font-size:12px;color:var(--ink-faint);">承認待ちの契約はありません</div>';return;
+    }
+    var statusLabel={pending:'承認待ち',approved:'承認済み',rejected:'否認済み'};
+    var statusClass={pending:'badge-orange',approved:'badge-green',rejected:'badge-gray'};
+    el.innerHTML=signerContracts.map(function(c){
+      var banker=signerBankers.find(function(b){return b.id===c.banker_id;})||{};
+      var d=c.created_at?new Date(c.created_at).toLocaleDateString('ja-JP'):'—';
+      var content=c.content||{};
+      return '<div class="card" style="margin-bottom:12px;padding:16px 20px;">'
+        +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px;">'
+        +'<div>'
+        +'<div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:4px;">'+esc(banker.full_name||'—')+'</div>'
+        +'<div style="font-size:11px;color:var(--ink-faint);">'+(banker.member_no||'未発番')+' ・ '+d+'</div>'
+        +'</div>'
+        +'<span class="badge '+(statusClass[c.status]||'badge-gray')+'">'+(statusLabel[c.status]||c.status)+'</span>'
+        +'</div>'
+        +(content.case_name?'<div style="font-size:12px;color:var(--ink-muted);margin-bottom:8px;">案件：'+esc(content.case_name)+'</div>':'')
+        +(content.amount?'<div style="font-size:12px;color:var(--ink-muted);margin-bottom:8px;">金額：'+formatNum(content.amount)+'円</div>':'')
+        +(content.condition?'<div style="font-size:12px;color:var(--ink-muted);margin-bottom:12px;">条件：'+esc(content.condition)+'</div>':'')
+        +(c.status==='pending'
+          ?'<div style="display:flex;gap:8px;">'
+          +'<button class="btn-sm btn-sm-red" onclick="approveContract(\''+c.id+'\',\''+esc(banker.full_name||'')+'\')" style="padding:8px 16px;">承認する</button>'
+          +'<button class="btn-sm btn-sm-gray" onclick="rejectContract(\''+c.id+'\',\''+esc(banker.full_name||'')+'\')" style="padding:8px 16px;">否認する</button>'
+          +'</div>'
+          :'')
+        +'</div>';
+    }).join('');
+  }
+
+  window.approveContract=function(id,name){
+    showModal('契約を承認する',
+      '<div style="padding:12px;background:var(--red-light);border:1px solid rgba(169,27,13,.2);border-radius:3px;margin-bottom:14px;font-size:12px;color:var(--red);">'+name+' 様の契約を承認します</div>'
+      +'<p style="font-size:12px;color:var(--ink-muted);">承認するとバンカーの契約管理ページに契約内容が記載されます。</p>',
+      function(){
+        fetch(API+'/api/signer/contracts/'+id+'/approve',{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'}})
+          .then(function(r){return r.json();})
+          .then(function(d){closeModal();if(d.message){alert('承認しました。');loadSignerContracts();}else alert('エラー：'+(d.error||'不明'));});
+      });
+  };
+
+  window.rejectContract=function(id,name){
+    showModal('契約を否認する',
+      '<div style="padding:12px;background:var(--red-light);border:1px solid rgba(169,27,13,.2);border-radius:3px;margin-bottom:14px;font-size:12px;color:var(--red);">'+name+' 様の契約を否認します</div>'
+      +'<div><label style="display:block;font-size:10px;font-weight:600;color:var(--ink-muted);margin-bottom:4px;">否認理由</label>'
+      +'<textarea id="reject-reason" rows="3" style="width:100%;padding:8px;font-size:13px;border:1px solid var(--border);border-radius:3px;font-family:var(--font);resize:vertical;" placeholder="理由を入力（任意）"></textarea></div>',
+      function(){
+        var reason=(document.getElementById('reject-reason')||{}).value||'';
+        fetch(API+'/api/signer/contracts/'+id+'/reject',{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({reason:reason})})
+          .then(function(r){return r.json();})
+          .then(function(d){closeModal();if(d.message){alert('否認しました。');loadSignerContracts();}else alert('エラー：'+(d.error||'不明'));});
+      });
+  };
+
+  // ============================================================
+  // ★ v11: サイナー機能 ── 報酬管理
+  // ============================================================
+  function loadSignerRewards(){
+    fetch(API+'/api/signer/rewards',{headers:{'Authorization':'Bearer '+token}})
+      .then(function(r){return r.json();})
+      .then(function(data){
+        signerRewards=data.rewards||[];
+        renderSignerRewards();
+        var unpaid=signerRewards.filter(function(r){return r.status==='unpaid';});
+        var total=unpaid.reduce(function(s,r){return s+(Number(r.amount)||0);},0);
+        set('signer-stat-unpaid-total',formatNum(total)+'円');
+      }).catch(function(){});
+  }
+
+  function renderSignerRewards(){
+    var el=document.getElementById('signer-rewards-list');if(!el)return;
+    if(!signerRewards.length){
+      el.innerHTML='<div style="padding:32px;text-align:center;font-size:12px;color:var(--ink-faint);">報酬データがありません</div>';return;
+    }
+    el.innerHTML='<table class="data-table"><thead><tr><th>バンカー</th><th>案件</th><th>条件</th><th>金額</th><th>ステータス</th><th>支払日</th></tr></thead><tbody>'
+      +signerRewards.map(function(r){
+        var banker=signerBankers.find(function(b){return b.id===r.banker_id;})||{};
+        var paid=r.paid_at?new Date(r.paid_at).toLocaleDateString('ja-JP'):'—';
+        var sl=r.status==='paid'?'支払済み':'未払い';
+        var sc=r.status==='paid'?'badge-green':'badge-orange';
+        return '<tr>'
+          +'<td style="font-weight:600;">'+esc(banker.full_name||'—')+'</td>'
+          +'<td style="font-size:11px;color:var(--ink-muted);">'+(r.case_name||'—')+'</td>'
+          +'<td style="font-size:11px;color:var(--ink-muted);">'+(r.condition||'—')+'</td>'
+          +'<td style="font-weight:700;font-variant-numeric:tabular-nums;">'+formatNum(r.amount)+'<span style="font-size:10px;color:var(--ink-muted);margin-left:2px;">円</span></td>'
+          +'<td><span class="badge '+sc+'">'+sl+'</span></td>'
+          +'<td style="font-size:11px;color:var(--ink-faint);">'+paid+'</td>'
+          +'</tr>';
+      }).join('')+'</tbody></table>';
+  }
+
+  window.openAddReward=function(){
+    if(!signerBankers.length){alert('傘下バンカーがいません。');return;}
+    var bankerOptions=signerBankers.map(function(b){
+      return '<option value="'+b.id+'">'+esc(b.full_name||'—')+'（'+(b.member_no||'未発番')+'）</option>';
+    }).join('');
+    showModal('報酬を登録する',
+      '<div style="margin-bottom:12px;"><label style="display:block;font-size:10px;font-weight:600;color:var(--ink-muted);margin-bottom:4px;">バンカー</label>'
+      +'<select id="rw-banker" style="width:100%;padding:8px;font-size:13px;border:1px solid var(--border);border-radius:3px;font-family:var(--font);">'+bankerOptions+'</select></div>'
+      +'<div style="margin-bottom:12px;"><label style="display:block;font-size:10px;font-weight:600;color:var(--ink-muted);margin-bottom:4px;">案件名</label>'
+      +'<input id="rw-case" type="text" placeholder="案件名を入力" style="width:100%;padding:8px;font-size:13px;border:1px solid var(--border);border-radius:3px;font-family:var(--font);"></div>'
+      +'<div style="margin-bottom:12px;"><label style="display:block;font-size:10px;font-weight:600;color:var(--ink-muted);margin-bottom:4px;">条件</label>'
+      +'<input id="rw-condition" type="text" placeholder="支払条件を入力" style="width:100%;padding:8px;font-size:13px;border:1px solid var(--border);border-radius:3px;font-family:var(--font);"></div>'
+      +'<div><label style="display:block;font-size:10px;font-weight:600;color:var(--ink-muted);margin-bottom:4px;">金額（円）</label>'
+      +'<input id="rw-amount" type="number" placeholder="0" style="width:100%;padding:8px;font-size:13px;border:1px solid var(--border);border-radius:3px;font-family:var(--font);"></div>',
+      function(){
+        var payload={
+          banker_id:(document.getElementById('rw-banker')||{}).value,
+          case_name:(document.getElementById('rw-case')||{}).value,
+          condition:(document.getElementById('rw-condition')||{}).value,
+          amount:Number((document.getElementById('rw-amount')||{}).value||0)
+        };
+        if(!payload.banker_id||!payload.amount){alert('バンカーと金額は必須です。');return;}
+        fetch(API+'/api/signer/rewards',{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(payload)})
+          .then(function(r){return r.json();})
+          .then(function(d){closeModal();if(d.reward){alert('登録しました。');loadSignerRewards();}else alert('エラー：'+(d.error||'不明'));});
+      });
+  };
+
+  // ============================================================
+  // 以下、v10から変更なし（通知・記事・紹介URL・管理者機能）
+  // ============================================================
+
   function updateNotifBadge(count){
     var els=['bell-badge','bell-tab-badge','notif-nav-badge'];
     els.forEach(function(id){
@@ -98,17 +316,14 @@
     if(ma)ma.style.display=count>0?'block':'none';
   }
 
-  // ★ 通知一覧レンダリング（generalカテゴリをお知らせとして扱う）
   function renderNotifications(arts){
     var notifs=arts.filter(function(a){return a.category==='general'||a.category==='rules';});
     var readIds=JSON.parse(localStorage.getItem(NOTIF_READ_KEY)||'[]');
     var unreadCount=notifs.filter(function(a){return readIds.indexOf(a.id)===-1;}).length;
     updateNotifBadge(unreadCount);
-
     var el=document.getElementById('notifications-list');if(!el)return;
     if(!notifs.length){
-      el.innerHTML='<div class="card" style="text-align:center;padding:32px;font-size:13px;color:var(--ink-faint);">お知らせはありません</div>';
-      return;
+      el.innerHTML='<div class="card" style="text-align:center;padding:32px;font-size:13px;color:var(--ink-faint);">お知らせはありません</div>';return;
     }
     el.innerHTML=notifs.map(function(a){
       var isRead=readIds.indexOf(a.id)!==-1;
@@ -132,16 +347,13 @@
     }).join('');
   }
 
-  // ★ 通知を既読にする
   window.readNotif=function(id){
     var readIds=JSON.parse(localStorage.getItem(NOTIF_READ_KEY)||'[]');
     if(readIds.indexOf(id)===-1){readIds.push(id);localStorage.setItem(NOTIF_READ_KEY,JSON.stringify(readIds));}
-    // 再レンダリング
     var arts=window._cachedArticles||[];
     renderNotifications(arts);
   };
 
-  // ★ すべて既読
   window.markAllNotifRead=function(){
     var arts=(window._cachedArticles||[]).filter(function(a){return a.category==='general'||a.category==='rules';});
     var ids=arts.map(function(a){return a.id;});
@@ -154,10 +366,10 @@
       .then(function(r){return r.json();})
       .then(function(data){
         var arts=data.articles||[];
-        window._cachedArticles=arts; // ★ キャッシュ
+        window._cachedArticles=arts;
         if(isAdmin){renderArticlesPreview(arts.slice(0,5));}
         renderArticlesList(arts);
-        renderNotifications(arts); // ★ 通知を更新
+        renderNotifications(arts);
         if(!isAdmin){
           var readIds=JSON.parse(localStorage.getItem('qxiv_read')||'[]');
           set('dash-unread',arts.filter(function(a){return readIds.indexOf(a.id)===-1;}).length);
@@ -473,7 +685,10 @@
       });
   };
 
-  var PANELS=['overview','articles','profile','referral','members','article-mgmt','article-form','notifications'];
+  // ★ v11: PANELSにサイナー用パネルを追加
+  var PANELS=['overview','articles','profile','referral','members','article-mgmt','article-form','notifications',
+    'signer-bankers','signer-contracts','signer-rewards'];
+
   window.switchPanel=function(name){
     PANELS.forEach(function(p){
       var el=document.getElementById('panel-'+p);if(el)el.classList.toggle('active',p===name);
@@ -481,7 +696,12 @@
     var titles={overview:'ダッシュボード',articles:isAdmin?'ブログ・記事管理':'記事一覧',
       profile:'会員情報',referral:'紹介URL',members:'会員管理','article-mgmt':'記事管理',
       'article-form':(document.getElementById('article-form-heading')||{}).textContent||'記事作成',
-      notifications:'お知らせ'};
+      notifications:'お知らせ',
+      // ★ v11: サイナー用タイトル
+      'signer-bankers':'バンカー管理',
+      'signer-contracts':'契約承認',
+      'signer-rewards':'報酬管理'
+    };
     set('topbar-title',titles[name]||name);
     PANELS.forEach(function(p){
       var nb=document.getElementById('nav-btn-'+p);if(nb)nb.classList.toggle('active',p===name);
@@ -495,7 +715,6 @@
     var current=document.getElementById('cp-current').value;
     var newpw=document.getElementById('cp-new').value;
     var confirm=document.getElementById('cp-confirm').value;
-    var msgEl=document.getElementById('cp-msg');
     if(!current||!newpw||!confirm){showCpMsg('すべての項目を入力してください。','error');return;}
     if(newpw.length<8){showCpMsg('新しいパスワードは8文字以上で入力してください。','error');return;}
     if(newpw!==confirm){showCpMsg('新しいパスワードが一致しません。','error');return;}
@@ -508,9 +727,7 @@
           document.getElementById('cp-current').value='';
           document.getElementById('cp-new').value='';
           document.getElementById('cp-confirm').value='';
-        } else {
-          showCpMsg('エラー：'+(d.error||'不明なエラー'),'error');
-        }
+        } else {showCpMsg('エラー：'+(d.error||'不明なエラー'),'error');}
       }).catch(function(){showCpMsg('通信エラーが発生しました。','error');});
   };
   function showCpMsg(text,type){
@@ -542,9 +759,7 @@
       btn.addEventListener('click',function(e){e.stopPropagation();window.toggleHamburger();});
     }
     var overlay=document.getElementById('sidebar-overlay');
-    if(overlay){
-      overlay.addEventListener('touchstart',function(){window.closeSidebar();},{passive:true});
-    }
+    if(overlay){overlay.addEventListener('touchstart',function(){window.closeSidebar();},{passive:true});}
   });
   function checkMobile(){
     var isMobile=window.innerWidth<=768;
@@ -553,22 +768,6 @@
   }
   checkMobile();
   window.addEventListener('resize',checkMobile);
-
-  window.toggleHamburger=function(){
-    var sidebar=document.querySelector('.sidebar');
-    var overlay=document.getElementById('sidebar-overlay');
-    if(!sidebar)return;
-    var isOpen=sidebar.classList.toggle('mobile-open');
-    if(overlay)overlay.classList.toggle('show',isOpen);
-    document.body.style.overflow=isOpen?'hidden':'';
-  };
-  window.closeSidebar=function(){
-    var sidebar=document.querySelector('.sidebar');
-    var overlay=document.getElementById('sidebar-overlay');
-    if(sidebar)sidebar.classList.remove('mobile-open');
-    if(overlay)overlay.classList.remove('show');
-    document.body.style.overflow='';
-  };
 
   window.doLogout=function(){
     localStorage.removeItem('qxiv_token');localStorage.removeItem('qxiv_refresh');localStorage.removeItem('qxiv_user');
@@ -660,7 +859,8 @@
   function esc(s){return String(s||'').replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 
   var initHash=window.location.hash.replace('#','');
-  var validPanels=['overview','articles','profile','referral','members','article-mgmt','notifications'];
+  var validPanels=['overview','articles','profile','referral','members','article-mgmt','notifications',
+    'signer-bankers','signer-contracts','signer-rewards'];
   if(initHash&&validPanels.indexOf(initHash)!==-1){switchPanel(initHash);}
   else{switchPanel('overview');}
 })();
