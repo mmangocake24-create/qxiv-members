@@ -659,5 +659,8 @@
   function formatNum(n){return Number(n||0).toLocaleString('ja-JP');}
   function esc(s){return String(s||'').replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 
-  switchPanel('overview');
+  var initHash=window.location.hash.replace('#','');
+  var validPanels=['overview','articles','profile','referral','members','article-mgmt','notifications'];
+  if(initHash&&validPanels.indexOf(initHash)!==-1){switchPanel(initHash);}
+  else{switchPanel('overview');}
 })();
