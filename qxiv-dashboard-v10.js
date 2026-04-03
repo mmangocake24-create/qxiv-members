@@ -543,6 +543,22 @@
   checkMobile();
   window.addEventListener('resize',checkMobile);
 
+  window.toggleHamburger=function(){
+    var sidebar=document.querySelector('.sidebar');
+    var overlay=document.getElementById('sidebar-overlay');
+    if(!sidebar)return;
+    var isOpen=sidebar.classList.toggle('mobile-open');
+    if(overlay)overlay.classList.toggle('show',isOpen);
+    document.body.style.overflow=isOpen?'hidden':'';
+  };
+  window.closeSidebar=function(){
+    var sidebar=document.querySelector('.sidebar');
+    var overlay=document.getElementById('sidebar-overlay');
+    if(sidebar)sidebar.classList.remove('mobile-open');
+    if(overlay)overlay.classList.remove('show');
+    document.body.style.overflow='';
+  };
+
   window.doLogout=function(){
     localStorage.removeItem('qxiv_token');localStorage.removeItem('qxiv_refresh');localStorage.removeItem('qxiv_user');
     window.location.href='/login';
