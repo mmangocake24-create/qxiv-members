@@ -535,6 +535,17 @@
     if(overlay)overlay.classList.remove('show');
     document.body.style.overflow='';
   };
+  document.addEventListener('DOMContentLoaded',function(){
+    var btn=document.getElementById('hamburger-btn');
+    if(btn){
+      btn.addEventListener('touchstart',function(e){e.stopPropagation();e.preventDefault();window.toggleHamburger();},{passive:false});
+      btn.addEventListener('click',function(e){e.stopPropagation();window.toggleHamburger();});
+    }
+    var overlay=document.getElementById('sidebar-overlay');
+    if(overlay){
+      overlay.addEventListener('touchstart',function(){window.closeSidebar();},{passive:true});
+    }
+  });
   function checkMobile(){
     var isMobile=window.innerWidth<=768;
     var logo=document.getElementById('mobile-logo');
